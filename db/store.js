@@ -1,34 +1,39 @@
 const util = require("util");
 const fs = require("fs");
 
-
-const uuidv1 = require('uuid');
+const { v4: uuidv4 } = require("uuid");
+const { stringify } = require("querystring");
 
 const readFileAsync = util.promisify(fs.readFile);
 const writeFileAsync = util.promisify(fs.writeFile);
 
 class Store {
-  read() {
-    return readFileAsync("db/db.json", "utf8");
-  }
-
-  write(note) {
-    return writeFileAsync("db/db.json", JSON.stringify(note));
-  }
-
-  getNotes() {
-    return this.read().then(notes => {
-      let parsedNotes;
-
-      try {
-        parsedNotes = [].concat(JSON.parse(notes));
-      } catch (err) {
-        parsedNotes = [];
-      }
-
-      return parsedNotes;
+  getNotes = () => {
+    return new Promise((resolve, reject) => {
+      fs.readFile("db/db.json", "utf8", function (err, data) {
+        if (err) {
+          console.log("err", err);
+          resolve([]);
+        }
+        resolve(JSON.parse(data));
+      });
     });
-  }
+  };
+  writeNotes = (noteObject) => {
+    return new Promise((resolve, reject) => {
+      fs.writeFile(
+        "db/db.json",
+        JSON.stringify(noteObject),
+        function (err, data) {
+          if (err) {
+            console.log("err", err);
+            resolve("failed to add notes");
+          }
+          resolve("successfully updated notes");
+        }
+      );
+    });
+  };
 
   addNote(note) {
     const { title, text } = note;
@@ -37,21 +42,21 @@ class Store {
       throw new Error("Please Note: 'title' and 'text' cannot be blank");
     }
 
-    
-    const newNote = { title, text, id: uuidv1() };
-
-    
-    return this.getNotes()
-      .then(notes => [...notes, newNote])
-      .then(updatedNotes => this.write(updatedNotes))
-      .then(() => newNote);
+    const newNote = { title, text, id: uuidv4() };
+    this.getNotes().then((result) => {
+      const parsedNote = result;
+      parsedNote.push(newNote);
+      console.log(parsedNote);
+      this.writeNotes(parsedNote);
+    });
   }
 
   removeNote(id) {
-    
-    return this.getNotes()
-      .then(notes => notes.filter(note => note.id !== id))
-      .then(filteredNotes => this.write(filteredNotes));
+    this.getNotes().then((notes) => {
+      const findNotes = notes.filter((note) => note.id !== id);
+      // const result = DeleteById(id, note);
+      this.writeNotes(findNotes);
+    });
   }
 }
 
